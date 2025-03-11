@@ -997,7 +997,7 @@ func (fs *FileSystem) Remove(p string) error {
 	gd.freeInodes++
 	gd.freeBlocks += uint32(removedInode.blocks)
 	// write the group descriptor back
-	gdBytes := gd.toBytes(fs.superblock.gdtChecksumType(), fs.superblock.uuid.ID())
+	gdBytes := gd.toBytes(fs.superblock.gdtChecksumType(), fs.superblock.checksumSeed)
 	gdtBlock := 1
 	if fs.superblock.blockSize == 1024 {
 		gdtBlock = 2
@@ -1117,7 +1117,7 @@ func (fs *FileSystem) readInode(inodeNumber uint32) (*inode, error) {
 	offsetInode := (inodeNumber - 1) % inodesPerGroup
 	// offset is how many bytes in our inode is
 	offset := offsetInode * uint32(inodeSize)
-	read, err := fs.backend.ReadAt(inodeBytes, int64(byteStart)+int64(offset))
+	read, err := fs.backend.ReadAt(inodeBytes, int64(fs.start)+int64(byteStart)+int64(offset))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read inode %d from offset %d of block %d from block group %d: %v", inodeNumber, offset, inodeTableBlock, bg, err)
 	}
@@ -1170,7 +1170,7 @@ func (fs *FileSystem) writeInode(i *inode) error {
 	// offset is how many bytes in our inode is
 	offset := int64(offsetInode) * int64(inodeSize)
 	inodeBytes := i.toBytes(sb)
-	wrote, err := writableFile.WriteAt(inodeBytes, int64(byteStart)+offset)
+	wrote, err := writableFile.WriteAt(inodeBytes, int64(fs.start)+int64(byteStart)+offset)
 	if err != nil {
 		return fmt.Errorf("failed to write inode %d at offset %d of block %d from block group %d: %v", i.number, offset, inodeTableBlock, bg, err)
 	}
@@ -1232,7 +1232,7 @@ func (fs *FileSystem) readFileBytes(extents extents, filesize uint64) ([]byte, e
 			count = filesize - uint64(len(b))
 		}
 		b2 := make([]byte, count)
-		read, err := fs.backend.ReadAt(b2, int64(start))
+		read, err := fs.backend.ReadAt(b2, int64(fs.start)+int64(start))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read bytes for extent %d: %v", i, err)
 		}
@@ -1588,7 +1588,7 @@ func (fs *FileSystem) allocateInode(parent uint32) (uint32, error) {
 	gd.freeInodes--
 
 	// get the group descriptor as bytes
-	gdBytes := gd.toBytes(fs.superblock.gdtChecksumType(), fs.superblock.uuid.ID())
+	gdBytes := gd.toBytes(fs.superblock.gdtChecksumType(), fs.superblock.checksumSeed)
 
 	// write the group descriptor bytes
 	// gdt starts in block 1 of any redundant copies, specifically in BG 0

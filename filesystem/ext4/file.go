@@ -167,7 +167,7 @@ func (fl *File) Write(b []byte) (int, error) {
 			toWriteInOffset = leftInExtent
 		}
 		// read those bytes
-		startPosOnDisk := e.startingBlock*blocksize + uint64(startPositionInExtent)
+		startPosOnDisk := e.startingBlock*blocksize + uint64(startPositionInExtent) + uint64(fl.filesystem.start)
 		b2 := make([]byte, toWriteInOffset)
 		copy(b2, b[writtenBytes:])
 		written, err := writableFile.WriteAt(b2, int64(startPosOnDisk))
@@ -180,10 +180,6 @@ func (fl *File) Write(b []byte) (int, error) {
 		if written >= len(b) {
 			break
 		}
-	}
-
-	if fl.offset >= fileSize {
-		err = io.EOF
 	}
 
 	return int(writtenBytes), err
